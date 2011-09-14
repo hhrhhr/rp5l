@@ -9,7 +9,6 @@
 
 #include <QFileDialog>
 #include "rp5l_structure.h"
-//#include <QByteArray>
 
 #include <QDebug>
 
@@ -26,17 +25,27 @@ public:
     ~Widget();
 
 private slots:
-    void on_toolButton_clicked();
+    void on_selectRpacks_clicked();
+    void on_selectOutput_clicked();
     void on_rpacksList_currentRowChanged(int currentRow);
-
     void on_scanRpack_clicked();
+    void on_unpackPrpack_clicked();
+
 
 private:
     Ui::Widget *ui;
     QString diPath;
+    QString outPath;
     void fillRpacksList();
-    header h;
     QString currentRpack;
+
+    header h;
+    QList<section> sections;
+    QList<fileset> filesets;
+    QList<unknown> unknowns;
+    QList<fnPtr> fnPtrs;
+    QList<filename> filenames;
+
 };
 
 #endif // WIDGET_H

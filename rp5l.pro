@@ -18,3 +18,7 @@ HEADERS  += widget.h \
 
 FORMS    += widget.ui
 
+RESOURCES += \
+    resources.qrc
+
+

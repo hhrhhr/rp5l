@@ -13,6 +13,8 @@ TEMPLATE = app
 SOURCES += main.cpp\
         widget.cpp
 
-HEADERS  += widget.h
+HEADERS  += widget.h \
+    rp5l_structure.h
 
 FORMS    += widget.ui
+

@@ -41,18 +41,19 @@ private:
     void fillRpacksList();
     void fillHeadersList();
     void scanRpack();
+    void unpackRpack();
 
-    header      h;
-    section     s[];
-    filepart    f[];
-    filemap     m[];
-    quint32     fp[];
-    QStringList fn;
+    header h;
+    QList<section> s;
+    QList<filepart> p;
+    QList<filemap> m;
+    QList<quint32> fp;
+    QList<QString> fn;
 
-    void unpackBlock(quint32 offs, quint32 pack, quint32 unpk);
 
     // tools
     QString addSpace(QString str);
+    void unpackBlock(quint32 offs, quint32 pack, quint32 unpk);
 
 };
 

@@ -21,6 +21,7 @@ Widget::Widget(QWidget *parent) :
     outPath = "i:\\tmp_DI\\unpack2";
     fillRpacksList();
 #endif
+
 }
 
 Widget::~Widget()
@@ -88,6 +89,7 @@ void Widget::on_scanRpack_clicked()
 void Widget::on_unpackRpack_clicked()
 {
     qDebug() << this << "on_unpackRpack_clicked";
+    unpackRpack();
 }
 
 // private ///////////////////////////////////////////////////////////////////////////////////////
@@ -129,16 +131,20 @@ void Widget::fillHeadersList()
        >> h.filesCount >> h.filenamesSize >> h.filenamesCount >> h.blockSize;
 
 //    read sections
-    section s[h.sectionCount];
+    s.reserve(h.sectionCount);
     quint32 i = 0;
     quint32 allPacked = 0;
     quint32 allUnpacked = 0;
     do {
-        in >> s[i].filetype >> s[i].type2 >> s[i].type3 >> s[i].type4;
-        in >> s[i].offset >> s[i].unpackedSize >> s[i].packedSize >> s[i].partsCount;
-        allPacked += s[i].packedSize;
-        allUnpacked += s[i].unpackedSize;
+        section q;
+        in >> q.filetype >> q.type2 >> q.type3 >> q.type4;
+        in >> q.offset >> q.unpackedSize >> q.packedSize >> q.partsCount;
+        s << q;
+        allPacked += q.packedSize;
+        allUnpacked += q.unpackedSize;
     } while (++i < h.sectionCount);
+
+    rpack.close();
 
 //    fill headers list
     QString magic("unknown");
@@ -163,73 +169,95 @@ void Widget::fillHeadersList()
     headAndSect << "rpack size:\t" + addSpace(QString::number(rpack.size())) + " bytes";
     headAndSect << "packed size:\t" + addSpace(QString::number(allPacked)) + " bytes";
     headAndSect << "unpacked size:\t" + addSpace(QString::number(allUnpacked)) + " bytes";
-
     ui->headerList->addItems(headAndSect);
-    if (h.compression != 1) {
-        ui->headerList->item(2)->setBackgroundColor(Qt::red);
-    }
 
-    rpack.close();
+    if (h.magic != 1278562386)
+        ui->headerList->item(0)->setBackgroundColor(Qt::red);
+
+    if (h.compression != 1)
+        ui->headerList->item(2)->setBackgroundColor(Qt::red);
+
 }
 
 void Widget::scanRpack()
 {
     qDebug() << this << "scanRpack";
     ui->filesList->clear();
+    s.clear();
+    p.clear();
+    m.clear();
+    fp.clear();
+    fn.clear();
 
     QFile rpack(inPath + "\\" + currentRpack);
     if (!rpack.open(QIODevice::ReadOnly))
         return;
     QDataStream in(&rpack);
     in.setByteOrder(QDataStream::LittleEndian);
-    rpack.seek(9*4 + h.sectionCount*4*5);   // jump to fileparts block
+    rpack.seek(9*4 + h.sectionCount*5*4);
 
     qDebug() << "fileparts" << rpack.pos();
-    filepart f[h.partsCount];
+    p.reserve(h.partsCount);
     quint32 i = 0;
     do {
-        in >> f[i].sectionIndex >> f[i].unk1 >> f[i].fileIndex;
-        in >> f[i].offset >> f[i].unpackedSize >> f[i].packedSize;
+        filepart q;
+        in >> q.sectionIndex >> q.unk1 >> q.fileIndex;
+        in >> q.offset >> q.unpackedSize >> q.packedSize;
+        p << q;
     } while (++i < h.partsCount);
 
     qDebug() << "filemaps" << rpack.pos();
-    filemap m[h.filenamesCount];
+    m.reserve(h.filenamesCount);
     i = 0;
     do {
-        in >> m[i].partsCount >> m[i].unk1 >> m[i].filetype;
-        in >> m[i].unk2 >> m[i].fileIndex >> m[i].firstPart;
+        filemap q;
+        in >> q.partsCount >> q.unk1 >> q.filetype;
+        in >> q.unk2 >> q.fileIndex >> q.firstPart;
+        m << q;
     } while (++i < h.filenamesCount);
 
     qDebug() << "fnPtrs" << rpack.pos();
-    quint32 fp[h.filenamesCount];
+    fp.reserve(h.filenamesCount);
     i = 0;
     do {
-        in >> fp[i];
+        quint32 q;
+        in >> q;
+        fp << q;
     } while (++i < h.filenamesCount);
 
     QByteArray ba;
     ba.resize(h.filenamesSize);
     char *data = ba.data();
     in.readRawData(data, h.filenamesSize);
-    fn.clear();
+
+    rpack.close();
+
+    fn.reserve(h.filenamesCount);
     i = 0;
     do {
-        fn << data + fp[i];
+        QString q;
+        q = data + fp.at(i);
+        fn << q ;
     } while (++i < h.filenamesCount);
 
     // fill filenames list
     QString filename;
     i = 0;
     do {
-        if (m[i].filetype == 32)
+        if (m.at(i).filetype == 32)
             filename = "tex";
-        else if (m[i].filetype == 48)
+        else if (m.at(i).filetype == 48)
             filename = "shd";
         else
             filename = "unk";
         filename = "(" + filename + ") " + fn.at(i);
         ui->filesList->addItem(filename);
     } while (++i < h.filenamesCount);
+}
+
+void Widget::unpackRpack()
+{
+    //
 }
 
 void Widget::unpackBlock(quint32 offs, quint32 pack, quint32 unpk)

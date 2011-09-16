@@ -8,6 +8,7 @@
 #endif
 
 #include <QFileDialog>
+#include <QListWidget>
 #include "rp5l_structure.h"
 
 #include <QDebug>
@@ -25,26 +26,33 @@ public:
     ~Widget();
 
 private slots:
-    void on_selectRpacks_clicked();
+    void on_selectInput_clicked();
     void on_selectOutput_clicked();
-    void on_rpacksList_currentRowChanged(int currentRow);
+    void on_rpackList_itemClicked(QListWidgetItem *item);
+    void on_rpackList_itemActivated(QListWidgetItem *item);
     void on_scanRpack_clicked();
-    void on_unpackPrpack_clicked();
-
+    void on_unpackRpack_clicked();
 
 private:
     Ui::Widget *ui;
-    QString diPath;
+    QString inPath;
     QString outPath;
-    void fillRpacksList();
     QString currentRpack;
+    void fillRpacksList();
+    void fillHeadersList();
+    void scanRpack();
 
-    header h;
-    QList<section> sections;
-    QList<fileset> filesets;
-    QList<unknown> unknowns;
-    QList<fnPtr> fnPtrs;
-    QList<filename> filenames;
+    header      h;
+    section     s[];
+    filepart    f[];
+    filemap     m[];
+    quint32     fp[];
+    QStringList fn;
+
+    void unpackBlock(quint32 offs, quint32 pack, quint32 unpk);
+
+    // tools
+    QString addSpace(QString str);
 
 };
 

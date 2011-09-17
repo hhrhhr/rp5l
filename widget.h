@@ -10,6 +10,7 @@
 #include <QFileDialog>
 #include <QListWidget>
 #include "rp5l_structure.h"
+#include <QTimer>
 
 #include <QDebug>
 
@@ -32,6 +33,7 @@ private slots:
     void on_rpackList_itemActivated(QListWidgetItem *item);
     void on_scanRpack_clicked();
     void on_unpackRpack_clicked();
+    void unpackRpack();
 
 private:
     Ui::Widget *ui;
@@ -41,7 +43,6 @@ private:
     void fillRpacksList();
     void fillHeadersList();
     void scanRpack();
-    void unpackRpack();
 
     header h;
     QList<section> s;
@@ -53,7 +54,7 @@ private:
 
     // tools
     QString addSpace(QString str);
-    void unpackBlock(quint32 offs, quint32 pack, quint32 unpk);
+    void unpackBlock(QDataStream &in, quint32 offs, quint32 pack, quint32 unpk, QDataStream &out);
 
 };
 

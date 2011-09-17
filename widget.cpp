@@ -63,7 +63,6 @@ void Widget::on_selectOutput_clicked()
 void Widget::on_rpackList_itemClicked(QListWidgetItem *item)
 {
     qDebug() << this << "on_rpackList_itemClicked";
-
     currentRpack = item->text();
     fillHeadersList();
 }
@@ -71,7 +70,6 @@ void Widget::on_rpackList_itemClicked(QListWidgetItem *item)
 void Widget::on_rpackList_itemActivated(QListWidgetItem *item)
 {
     qDebug() << this << "on_rpackList_itemActivated";
-
     currentRpack = item->text();
     fillHeadersList();
 }
@@ -79,17 +77,20 @@ void Widget::on_rpackList_itemActivated(QListWidgetItem *item)
 void Widget::on_scanRpack_clicked()
 {
     qDebug() << this << "on_scanRpack_clicked";
-
     if (!ui->headerList->count())
         return;
-
     scanRpack();
 }
 
 void Widget::on_unpackRpack_clicked()
 {
     qDebug() << this << "on_unpackRpack_clicked";
-    unpackRpack();
+    if (!ui->filesList->count())
+        return;
+    if (h.compression != 1)
+        return;
+    ui->tabWidget->setDisabled(1);
+    QTimer::singleShot(1000, this, SLOT(unpackRpack()));
 }
 
 // private ///////////////////////////////////////////////////////////////////////////////////////
@@ -100,6 +101,7 @@ void Widget::fillRpacksList()
     ui->lbInDirectory->setText(inPath);
     ui->lbOutDirectory->setText(outPath);
     ui->tabWidget->setTabText(0, "rpack not selected");
+    ui->filesList->clear();
     ui->headerList->clear();
     ui->rpackList->clear();
 
@@ -131,6 +133,7 @@ void Widget::fillHeadersList()
        >> h.filesCount >> h.filenamesSize >> h.filenamesCount >> h.blockSize;
 
 //    read sections
+    s.clear();
     s.reserve(h.sectionCount);
     quint32 i = 0;
     quint32 allPacked = 0;
@@ -183,26 +186,27 @@ void Widget::scanRpack()
 {
     qDebug() << this << "scanRpack";
     ui->filesList->clear();
-    s.clear();
     p.clear();
     m.clear();
     fp.clear();
     fn.clear();
+
+    if (h.partsCount == 0)
+        return;
 
     QFile rpack(inPath + "\\" + currentRpack);
     if (!rpack.open(QIODevice::ReadOnly))
         return;
     QDataStream in(&rpack);
     in.setByteOrder(QDataStream::LittleEndian);
-    rpack.seek(9*4 + h.sectionCount*5*4);
+    rpack.seek(9*4 + h.sectionCount*5*4);       // skip header and sections
 
     qDebug() << "fileparts" << rpack.pos();
     p.reserve(h.partsCount);
     quint32 i = 0;
     do {
         filepart q;
-        in >> q.sectionIndex >> q.unk1 >> q.fileIndex;
-        in >> q.offset >> q.unpackedSize >> q.packedSize;
+        in >> q.sectionIndex >> q.unk1 >> q.fileIndex >> q.offset >> q.unpackedSize >> q.packedSize;
         p << q;
     } while (++i < h.partsCount);
 
@@ -211,8 +215,7 @@ void Widget::scanRpack()
     i = 0;
     do {
         filemap q;
-        in >> q.partsCount >> q.unk1 >> q.filetype;
-        in >> q.unk2 >> q.fileIndex >> q.firstPart;
+        in >> q.partsCount >> q.unk1 >> q.filetype >> q.unk2 >> q.fileIndex >> q.firstPart;
         m << q;
     } while (++i < h.filenamesCount);
 
@@ -244,28 +247,113 @@ void Widget::scanRpack()
     QString filename;
     i = 0;
     do {
+        filename = "(";
         if (m.at(i).filetype == 32)
-            filename = "tex";
+            filename += "tex";
         else if (m.at(i).filetype == 48)
-            filename = "shd";
+            filename += "shd";
         else
-            filename = "unk";
-        filename = "(" + filename + ") " + fn.at(i);
+            filename += QString::number(m.at(i).filetype);
+        filename += ") " + fn.at(i);
         ui->filesList->addItem(filename);
     } while (++i < h.filenamesCount);
 }
 
 void Widget::unpackRpack()
 {
-    //
+    QDir outdir;
+    outdir.mkpath(outPath + "\\" + currentRpack);
+    outdir.setCurrent(outPath + "\\" + currentRpack);
+
+    QFile rpack(inPath + "\\" + currentRpack);
+    if (!rpack.open(QIODevice::ReadOnly)) return;
+    QDataStream in(&rpack);
+
+    QByteArray texHeader;
+    QDataStream tex(&texHeader, QIODevice::ReadWrite);
+    char *texdata = texHeader.data();
+
+    for (quint32 i = 0; i < h.filenamesCount; ++i) {
+        QString outname = QString("%1__%2.%3")
+                          .arg(i)
+                          .arg(fn.at(i))
+                          .arg(m.at(i).filetype);
+
+        QFile outfile(outname);
+        if (!outfile.open(QIODevice::WriteOnly)) return;
+        QDataStream out(&outfile);
+
+        quint32 ptr = m.at(i).firstPart;
+        quint32 count = m.at(i).partsCount;
+// qDebug() << "start" << ptr << "count" << count;
+        do {
+            quint8 sidx = p.at(ptr).sectionIndex;
+            quint32 offs = p.at(ptr).offset;
+            quint32 pack = p.at(ptr).packedSize;
+            quint32 unpk = p.at(ptr).unpackedSize;
+            quint8 sect = s.at(sidx).filetype;
+            quint32 soffs = s.at(sidx).offset;
+
+            if (sect == 32) {
+// texture header
+                if (!texHeader.size()) {
+// qDebug() << "\t\tunpack texture headers";
+                    quint32 spack = s.at(sidx).packedSize;
+                    quint32 sunpk = s.at(sidx).unpackedSize;
+// qDebug() << "\t\tsect:" << soffs << spack << sunpk;
+                    texHeader.resize(sunpk);
+                    texdata = texHeader.data();
+                    unpackBlock(in, soffs, spack, sunpk, tex);
+                }
+// qDebug() << "\thead:" << offs << unpk;
+                out.writeRawData(texdata+offs, unpk);
+            } else {
+// all other files
+                QByteArray tmpUnpack;
+                QDataStream tmp(&tmpUnpack, QIODevice::ReadWrite);
+                tmpUnpack.resize(unpk);
+                char *tmpdata = tmpUnpack.data();
+// qDebug() << "\tbody:" << soffs << offs << unpk << pack << tmpUnpack.size();
+                unpackBlock(in, soffs + offs, pack, unpk, tmp);
+                out.writeRawData(tmpdata, unpk);
+            }
+            ptr++;
+        } while (--count);
+        outfile.close();
+    }
+    rpack.close();
+    ui->tabWidget->setEnabled(1);
 }
 
-void Widget::unpackBlock(quint32 offs, quint32 pack, quint32 unpk)
+void Widget::unpackBlock(QDataStream &in, quint32 offs, quint32 pack, quint32 unpk, QDataStream &out)
 {
+    // prepare array
+    QByteArray compressed;
+    compressed.resize(pack + 4);
+    QDataStream t(&compressed, QIODevice::WriteOnly);
+    char *cdata = compressed.data();
 
-    // unpack
-//    unpacked.resize(size_unpacked);
-//    unpacked = qUncompress(packed);
+    // read compressed block
+    in.device()->seek(offs - 4);
+    in.readRawData(cdata, pack + 4);
+
+    // insert size of uncompressed data
+    QByteArray size;
+    size.resize(4);
+    QDataStream s(&size, QIODevice::WriteOnly);
+    s << unpk;
+    compressed.replace(0, 4, size);
+
+    // unpack and write output block
+    QByteArray uncompressed;
+    uncompressed.resize(unpk);
+    uncompressed = qUncompress(compressed);
+    const char *udata = uncompressed.data();
+    int written = out.writeRawData(udata, unpk);
+    if (written == -1)
+        qCritical() << "write failed!";
+
+//    out.writeRawData(qUncompress(compressed).data(), unpk);
 }
 
 // tools

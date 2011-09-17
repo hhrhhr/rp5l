@@ -35,6 +35,14 @@ private slots:
     void on_unpackRpack_clicked();
     void unpackRpack();
 
+    void on_scanTextures_clicked();
+    void on_texturesList_currentRowChanged(int index);
+    void on_texturesList_itemClicked(QListWidgetItem *item);
+
+    void on_tabWidget_currentChanged(int index);
+
+    void on_pushButton_2_clicked();
+
 private:
     Ui::Widget *ui;
     QString inPath;
@@ -43,6 +51,9 @@ private:
     void fillRpacksList();
     void fillHeadersList();
     void scanRpack();
+
+    QString currentTexture;
+    void scanTexture();
 
     header h;
     QList<section> s;

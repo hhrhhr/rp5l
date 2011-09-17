@@ -397,3 +397,85 @@ QString Widget::addSpace(QString str)
     return str;
 }
 
+void Widget::on_scanTextures_clicked()
+{
+    qDebug() << "on_scanTextures_clicked()";
+
+    ui->texturesList->clear();
+    ui->detailsList->clear();
+
+    QString texPath = outPath + "\\" + currentRpack;
+    QDir dir(texPath);
+    if (!dir.exists())
+        return;
+    dir.setCurrent(texPath);
+    QStringList textures;
+    textures << dir.entryList(QStringList("*.32"), QDir::Files);
+    ui->texturesList->addItems(textures);
+}
+
+void Widget::on_texturesList_currentRowChanged(int index)
+{
+    if (!ui->texturesList->count())
+        return;
+    if (index == -1)
+        return;
+    currentTexture = ui->texturesList->item(index)->text();
+    scanTexture();
+}
+
+
+void Widget::on_texturesList_itemClicked(QListWidgetItem *item)
+{
+    if (!ui->texturesList->count())
+        return;
+    currentTexture = item->text();
+    scanTexture();
+}
+
+void Widget::scanTexture()
+{
+    ui->detailsList->clear();
+
+    QFile texture(outPath + "\\" + currentRpack + "\\" + currentTexture);
+    if (!texture.open(QIODevice::ReadOnly))
+        return;
+    QDataStream tex(&texture);
+    tex.setByteOrder(QDataStream::LittleEndian);
+    quint16 width, height, unk1, cubemaps;
+    quint32 mips, dxt;
+    tex >> width >> height >> unk1 >> cubemaps;
+    tex >> mips >> dxt;
+    quint32 mip[mips];
+    for (uint i = 0; i < mips; ++i) {
+        tex >> mip[i];
+    };
+    texture.close();
+
+    QStringList td;
+    td << "width\t" + QString::number(width);
+    td << "height\t" + QString::number(height);
+    td << "unk1\t" + QString::number(unk1);
+    td << "cubemaps\t" + QString::number(cubemaps);
+    td << "mips\t" + QString::number(mips);
+    td << "dxt\t" + QString::number(dxt);
+    for (uint i = 0; i < mips; ++i) {
+        td << QString("mip%1\t").arg(i) + QString::number(mip[i]);
+    };
+
+    ui->detailsList->addItems(td);
+}
+
+
+void Widget::on_tabWidget_currentChanged(int index)
+{
+    if (index != 1)
+        return;
+
+    on_scanTextures_clicked();
+}
+
+void Widget::on_pushButton_2_clicked()
+{
+
+}

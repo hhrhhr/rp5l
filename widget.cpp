@@ -322,6 +322,33 @@ void Widget::unpackRpack()
         outfile.close();
     }
     rpack.close();
+
+    // save structure
+    QFile structure("..\\" + currentRpack + ".struct");
+    if (!structure.open(QIODevice::WriteOnly)) return;
+    QDataStream st(&structure);
+//    st.setByteOrder(QDataStream::LittleEndian);
+
+    st << h.magic << h.version << h.compression << h.partsCount << h.sectionCount
+       << h.filesCount << h.filenamesSize << h.filenamesCount << h.blockSize;
+    foreach (section i, s) {
+        st << i.filetype << i.type2 << i.type3 << i.type4
+           << i.offset << i.unpackedSize << i.packedSize << i.partsCount;
+    }
+    foreach (filepart i, p) {
+        st << i.sectionIndex << i.unk1 << i.fileIndex << i.offset << i.unpackedSize << i.packedSize;
+    }
+    foreach (filemap i, m) {
+        st << i.partsCount << i.unk1 << i.filetype << i.unk2 << i.fileIndex << i.firstPart;
+    }
+    foreach (quint32 i, fp) {
+        st << i;
+    }
+    foreach (QString i, fn) {
+        st << i;
+    }
+    structure.close();
+
     ui->tabWidget->setEnabled(1);
 }
 

@@ -31,13 +31,13 @@ struct filepart {
     quint8 sectionIndex;        // 0 ... header.sectionCount-1
     quint8 unk1;                //
     quint16 fileIndex;          //
-    quint32 offset;             // section.offset + fileset.offset
+    quint32 offset;             // relative to section.offset
     quint32 unpackedSize;       //
     quint32 packedSize;         // 0-not packed
 };
 
 struct filemap {
-    quint8 partsCount;           // parts count
+    quint8 partsCount;          // parts count
     quint8 unk1;                // 0
     quint8 filetype;            // file type
     quint8 unk2;                // ???
@@ -45,13 +45,14 @@ struct filemap {
     quint32 firstPart;          // start part
 };
 
+// not used
 struct rp5l {
-    header head;
-    section sect[];
-    filepart part[];
-    filemap map[];
-    quint32 fnptr[];
-    QString name[];
+    header      head;
+    section     sect[];
+    filepart    part[];
+    filemap     map[];
+    quint32     fnptr[];
+    QString     name[];
 };
 
 #endif // RP5L_STRUCTURE_H

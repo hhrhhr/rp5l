@@ -152,7 +152,14 @@
          <item>
           <widget class="QPushButton" name="unpackRpack">
            <property name="text">
-            <string>unpack</string>
+            <string>unpack current</string>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="unpackAll">
+           <property name="text">
+            <string>unpack all</string>
            </property>
           </widget>
          </item>

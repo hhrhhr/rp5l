@@ -11,8 +11,10 @@
 #include <QListWidget>
 #include "rp5l_structure.h"
 #include <QTimer>
-
 #include <QDebug>
+
+#include <QtConcurrentRun>
+using namespace QtConcurrent;
 
 namespace Ui {
     class Widget;
@@ -33,7 +35,8 @@ private slots:
     void on_rpackList_itemActivated(QListWidgetItem *item);
     void on_scanRpack_clicked();
     void on_unpackRpack_clicked();
-    void unpackRpack();
+    void on_unpackAll_clicked();
+    void startUnpackRpack();
 
     void on_scanTextures_clicked();
     void on_texturesList_currentRowChanged(int index);
@@ -43,7 +46,9 @@ private slots:
 
     void on_pushButton_2_clicked();
 
+
 private:
+    void unpackRpack();
     Ui::Widget *ui;
     QString inPath;
     QString outPath;
@@ -61,7 +66,6 @@ private:
     QList<filemap> m;
     QList<quint32> fp;
     QList<QString> fn;
-
 
     // tools
     QString addSpace(QString str);

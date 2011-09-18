@@ -90,7 +90,37 @@ void Widget::on_unpackRpack_clicked()
     if (h.compression != 1)
         return;
     ui->tabWidget->setDisabled(1);
-    QTimer::singleShot(1000, this, SLOT(unpackRpack()));
+    QTimer::singleShot(1000, this, SLOT(startUnpackRpack()));
+    ui->tabWidget->setEnabled(1);
+}
+
+void Widget::startUnpackRpack()
+{
+    unpackRpack();
+}
+
+void Widget::on_unpackAll_clicked()
+{
+    qDebug() << this << "on_unpackAll_clicked";
+    int count = ui->rpackList->count();
+    if (!count)
+        return;
+    int i = 0;
+    do {
+        currentRpack = ui->rpackList->item(i)->text();
+        fillHeadersList();
+        scanRpack();
+        if (h.compression == 1) {
+            qDebug() << currentRpack << "unpacking...";
+//            unpackRpack();
+            QFuture<void> future = QtConcurrent::run(this, &Widget::unpackRpack);
+            future.waitForFinished();
+        } else {
+            qDebug() << currentRpack << "compression unknown";
+        }
+        i++;
+    } while (i < count);
+
 }
 
 // private ///////////////////////////////////////////////////////////////////////////////////////
@@ -201,7 +231,7 @@ void Widget::scanRpack()
     in.setByteOrder(QDataStream::LittleEndian);
     rpack.seek(9*4 + h.sectionCount*5*4);       // skip header and sections
 
-    qDebug() << "fileparts" << rpack.pos();
+//    qDebug() << "fileparts" << rpack.pos();
     p.reserve(h.partsCount);
     quint32 i = 0;
     do {
@@ -210,7 +240,7 @@ void Widget::scanRpack()
         p << q;
     } while (++i < h.partsCount);
 
-    qDebug() << "filemaps" << rpack.pos();
+//    qDebug() << "filemaps" << rpack.pos();
     m.reserve(h.filenamesCount);
     i = 0;
     do {
@@ -219,7 +249,7 @@ void Widget::scanRpack()
         m << q;
     } while (++i < h.filenamesCount);
 
-    qDebug() << "fnPtrs" << rpack.pos();
+//    qDebug() << "fnPtrs" << rpack.pos();
     fp.reserve(h.filenamesCount);
     i = 0;
     do {
@@ -349,7 +379,6 @@ void Widget::unpackRpack()
     }
     structure.close();
 
-    ui->tabWidget->setEnabled(1);
 }
 
 void Widget::unpackBlock(QDataStream &in, quint32 offs, quint32 pack, quint32 unpk, QDataStream &out)
@@ -479,3 +508,5 @@ void Widget::on_pushButton_2_clicked()
 {
 
 }
+
+

@@ -60,6 +60,16 @@ void Widget::on_selectOutput_clicked()
     ui->lbOutDirectory->setText(outPath);
 }
 
+void Widget::on_tabWidget_currentChanged(int index)
+{
+    if (index != 1)
+        return;
+
+    on_scanTextures_clicked();
+}
+
+/////////////////////////////////// page 1 /////////////////////////////////////////////////////
+
 void Widget::on_rpackList_itemClicked(QListWidgetItem *item)
 {
     qDebug() << this << "on_rpackList_itemClicked";
@@ -89,14 +99,17 @@ void Widget::on_unpackRpack_clicked()
         return;
     if (h.compression != 1)
         return;
-    ui->tabWidget->setDisabled(1);
-    QTimer::singleShot(1000, this, SLOT(startUnpackRpack()));
-    ui->tabWidget->setEnabled(1);
+    QTimer::singleShot(500, this, SLOT(startUnpackRpack()));
 }
 
 void Widget::startUnpackRpack()
 {
+    qDebug() << this << "startUnpackRpack";
+    //    QFuture<void> future = QtConcurrent::run(this, &Widget::unpackRpack);
     unpackRpack();
+    QMessageBox msgBox;
+    msgBox.setText("unpack finished");
+    msgBox.exec();
 }
 
 void Widget::on_unpackAll_clicked()
@@ -112,15 +125,61 @@ void Widget::on_unpackAll_clicked()
         scanRpack();
         if (h.compression == 1) {
             qDebug() << currentRpack << "unpacking...";
-//            unpackRpack();
-            QFuture<void> future = QtConcurrent::run(this, &Widget::unpackRpack);
-            future.waitForFinished();
+            unpackRpack();
+//            QFuture<void> future = QtConcurrent::run(this, &Widget::unpackRpack);
+//            future.waitForFinished();
         } else {
             qDebug() << currentRpack << "compression unknown";
         }
         i++;
     } while (i < count);
 
+}
+
+/////////////////////////////////// page 2 /////////////////////////////////////////////////////
+
+void Widget::on_texturesList_currentRowChanged(int index)
+{
+    if (!ui->texturesList->count())
+        return;
+    if (index == -1)
+        return;
+    currentTexture = ui->texturesList->item(index)->text();
+    scanTexture();
+}
+
+
+void Widget::on_texturesList_itemClicked(QListWidgetItem *item)
+{
+    if (!ui->texturesList->count())
+        return;
+    currentTexture = item->text();
+    scanTexture();
+}
+
+void Widget::on_unpackTexture_clicked()
+{
+    qDebug() << this << "on_unpackTexture_clicked";
+    if (!ui->texturesList->count())
+        return;
+    unpackTexture();
+}
+
+
+void Widget::on_unpackAllTextures_clicked()
+{
+    qDebug() << this << "on_unpackAllTextures_clicked";
+    if (!ui->texturesList->count())
+        return;
+    int count = ui->texturesList->count();
+    if (!count)
+        return;
+    int i = 0;
+    do {
+        currentTexture = ui->texturesList->item(i)->text();
+        unpackTexture();
+        i++;
+    } while (i < count);
 }
 
 // private ///////////////////////////////////////////////////////////////////////////////////////
@@ -278,10 +337,18 @@ void Widget::scanRpack()
     i = 0;
     do {
         filename = "(";
-        if (m.at(i).filetype == 32)
+        if (m.at(i).filetype == 16)
+            filename += "msh";
+        else if (m.at(i).filetype == 32)
             filename += "tex";
         else if (m.at(i).filetype == 48)
             filename += "shd";
+        else if (m.at(i).filetype == 64)
+            filename += "anm";
+        else if (m.at(i).filetype == 66)
+            filename += "anm2";
+        else if (m.at(i).filetype == 80)
+            filename += "fx";
         else
             filename += QString::number(m.at(i).filetype);
         filename += ") " + fn.at(i);
@@ -304,10 +371,26 @@ void Widget::unpackRpack()
     char *texdata = texHeader.data();
 
     for (quint32 i = 0; i < h.filenamesCount; ++i) {
-        QString outname = QString("%1__%2.%3")
-                          .arg(i)
-                          .arg(fn.at(i))
-                          .arg(m.at(i).filetype);
+        QString ext;
+        if (m.at(i).filetype == 16)
+            ext = "msh";
+        else if (m.at(i).filetype == 32)
+            ext = "tex";
+        else if (m.at(i).filetype == 48)
+            ext = "shd";
+        else if (m.at(i).filetype == 64)
+            ext = "anm";
+        else if (m.at(i).filetype == 66)
+            ext = "anm2";
+        else if (m.at(i).filetype == 80)
+            ext = "fx";
+        else
+            ext = QString::number(m.at(i).filetype);
+//        QString outname = QString("%1__%2.%3")
+//                          .arg(i)
+//                          .arg(fn.at(i))
+//                          .arg(ext);
+        QString outname = QString("%1.%2").arg(fn.at(i)).arg(ext);
 
         QFile outfile(outname);
         if (!outfile.open(QIODevice::WriteOnly)) return;
@@ -378,7 +461,6 @@ void Widget::unpackRpack()
         st << i;
     }
     structure.close();
-
 }
 
 void Widget::unpackBlock(QDataStream &in, quint32 offs, quint32 pack, quint32 unpk, QDataStream &out)
@@ -426,6 +508,8 @@ QString Widget::addSpace(QString str)
     return str;
 }
 
+// textures
+
 void Widget::on_scanTextures_clicked()
 {
     qDebug() << "on_scanTextures_clicked()";
@@ -439,27 +523,8 @@ void Widget::on_scanTextures_clicked()
         return;
     dir.setCurrent(texPath);
     QStringList textures;
-    textures << dir.entryList(QStringList("*.32"), QDir::Files);
+    textures << dir.entryList(QStringList("*.tex"), QDir::Files);
     ui->texturesList->addItems(textures);
-}
-
-void Widget::on_texturesList_currentRowChanged(int index)
-{
-    if (!ui->texturesList->count())
-        return;
-    if (index == -1)
-        return;
-    currentTexture = ui->texturesList->item(index)->text();
-    scanTexture();
-}
-
-
-void Widget::on_texturesList_itemClicked(QListWidgetItem *item)
-{
-    if (!ui->texturesList->count())
-        return;
-    currentTexture = item->text();
-    scanTexture();
 }
 
 void Widget::scanTexture()
@@ -495,18 +560,70 @@ void Widget::scanTexture()
     ui->detailsList->addItems(td);
 }
 
-
-void Widget::on_tabWidget_currentChanged(int index)
+void Widget::unpackTexture()
 {
-    if (index != 1)
+    QFile texture(outPath + "\\" + currentRpack + "\\" + currentTexture);
+    if (!texture.open(QIODevice::ReadOnly))
         return;
+    QDataStream tex(&texture);
+    tex.setByteOrder(QDataStream::LittleEndian);
+    quint16 width, height, unk1, cubemaps;
+    quint32 mips, dxt;
+    tex >> width >> height >> unk1 >> cubemaps;
+    tex >> mips >> dxt;
+    quint32 mip[mips];
+    for (uint i = 0; i < mips; ++i) {
+        tex >> mip[i];
+    };
 
-    on_scanTextures_clicked();
+    QDir dir;
+    dir.mkpath(outPath + "\\" + currentRpack + "_dds");
+    QFile textureDDS(outPath + "\\" + currentRpack + "_dds" + "\\" + currentTexture + ".dds");
+    if (!textureDDS.open(QIODevice::WriteOnly))
+        return;
+    QDataStream ddsOut(&textureDDS);
+
+    // DXT1 header
+    static const char ddsHeader[] = {
+        0x44, 0x44, 0x53, 0x20, 0x7C, 0x00, 0x00, 0x00, 0x07, 0x10, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x00,
+        0x05, 0x00, 0x00, 0x00, 0x44, 0x58, 0x54, 0x31, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x08, 0x10, 0x40, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+    };
+
+    QByteArray ddsHead = QByteArray::fromRawData(ddsHeader, sizeof(ddsHeader));
+//    QDataStream ddsIn(&ddsHead, QIODevice::ReadWrite);
+    char *ddata = ddsHead.data();
+
+    QByteArray tmp(mip[0], 0x00);
+    QDataStream t(&tmp, QIODevice::WriteOnly);
+    char *tdata = tmp.data();
+    t.setByteOrder(QDataStream::LittleEndian);
+
+    t << (quint32)height << (quint32)width;
+    ddsHead.replace(0x0C, 8, tmp, 8);
+
+    if (dxt == 19 || dxt == 18) {
+        t.device()->seek(0);
+        t << (quint8)0x35;
+        ddsHead.replace(87, 1, tmp, 1);
+    } else if (dxt == 2) {
+        t.device()->seek(0);
+        t << (quint32)0 << (quint8)32;
+        ddsHead.replace(84, 5, tmp, 5);
+    }
+
+    ddsOut.writeRawData(ddata, 128);
+    t.device()->seek(0);
+    quint32 offset = tex.device()->size() - mip[0];
+    tex.device()->seek(offset);
+    tex.readRawData(tdata, mip[0]);
+    ddsOut.writeRawData(tdata, mip[0]);
+
+    textureDDS.close();
+    texture.close();
 }
-
-void Widget::on_pushButton_2_clicked()
-{
-
-}
-
-

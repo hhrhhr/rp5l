@@ -11,6 +11,7 @@
 #include <QListWidget>
 #include "rp5l_structure.h"
 #include <QTimer>
+#include <QMessageBox>
 #include <QDebug>
 
 #include <QtConcurrentRun>
@@ -44,11 +45,12 @@ private slots:
 
     void on_tabWidget_currentChanged(int index);
 
-    void on_pushButton_2_clicked();
+    void on_unpackTexture_clicked();
 
+
+    void on_unpackAllTextures_clicked();
 
 private:
-    void unpackRpack();
     Ui::Widget *ui;
     QString inPath;
     QString outPath;
@@ -56,9 +58,11 @@ private:
     void fillRpacksList();
     void fillHeadersList();
     void scanRpack();
+    void unpackRpack();
 
     QString currentTexture;
     void scanTexture();
+    void unpackTexture();
 
     header h;
     QList<section> s;
